@@ -1,0 +1,1 @@
+Run the cmd as go run main.go -f <filename> -m <mongo_uri> -db <mongo_db> -e <event>

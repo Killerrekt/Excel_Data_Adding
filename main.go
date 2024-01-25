@@ -2,10 +2,10 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log"
 
-	"github.com/spf13/viper"
 	"github.com/xuri/excelize/v2"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -26,13 +26,32 @@ type Data struct {
 	TransactionID        string `bson:"transaction_id"`
 	InvoiceNo            string `bson:"invoice_no"`
 	AmountPaid           string `bson:"amount_paid"`
+	Event                string `bson:"event"`
 }
 
+var Mongo, DB *string
+
 func main() {
-	viper.SetConfigFile(".env")
-	viper.AutomaticEnv()
-	viper.ReadInConfig()
-	file, err := excelize.OpenFile("registration_report_25_01_2024.xlsx") //vchange the name based on the excel sheet name
+
+	FileName := flag.String("f", "", "")
+	Mongo = flag.String("m", "mongodb://localhost:27017/", "")
+	DB = flag.String("db", "", "")
+	Event := flag.String("e", "", "")
+
+	flag.Parse()
+	if *FileName == "" {
+		log.Fatalln("Failed to mention the filename")
+	}
+
+	if *DB == "" {
+		log.Fatalln("Didn't mention the DB")
+	}
+
+	if *Event == "" {
+		log.Fatalln("Didn't pass any event")
+	}
+
+	file, err := excelize.OpenFile(*FileName + ".xlsx")
 	if err != nil {
 		log.Println("Failed to open the file")
 	}
@@ -42,7 +61,6 @@ func main() {
 		}
 	}()
 	rows, err := file.GetRows("Worksheet")
-	//fmt.Println(rows[1:])
 
 	ConnectToMongo()
 
@@ -62,6 +80,7 @@ func main() {
 		temp.TransactionID = v[11]
 		temp.InvoiceNo = v[12]
 		temp.AmountPaid = v[13]
+		temp.Event = *Event
 		Col.InsertOne(context.TODO(), temp)
 	}
 
@@ -72,11 +91,11 @@ var Col *mongo.Collection
 
 func ConnectToMongo() {
 	var err error
-	mongodb, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(viper.GetString("MONGO_URI")))
+	mongodb, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(*Mongo))
 	if err != nil {
 		log.Fatalln("Failed to connect to the mongo : " + err.Error())
 	}
-	DB := mongodb.Database(viper.GetString("MONGO_DATABASE"))
+	DB := mongodb.Database(*DB)
 	Col = DB.Collection("Excel_Data")
 	log.Println("Successfully connected to the MongoDB")
 }
